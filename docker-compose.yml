@@ -1,0 +1,13 @@
+services:
+  smart-waste-assistant:
+    build: .
+    container_name: smart-waste-sorter
+    ports:
+      - "8011:8011"
+    environment:
+      - PORT=8011
+      - HOST=0.0.0.0
+      - DB_PATH=/app/data/waste_assistant.db
+    volumes:
+      - ./data:/app/data
+    restart: unless-stopped

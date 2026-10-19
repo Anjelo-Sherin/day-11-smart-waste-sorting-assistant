@@ -1,0 +1,505 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Smart Waste Sorting Assistant with Recycling Map — Day 11</title>
+  
+  <!-- Tailwind CSS -->
+  <script src="https://cdn.tailwindcss.com"></script>
+  
+  <!-- Leaflet CSS & JS -->
+  <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css" />
+  <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
+  
+  <!-- Custom App Styles -->
+  <link rel="stylesheet" href="/static/style.css">
+  <link rel="manifest" href="/manifest.json">
+</head>
+<body class="bg-slate-950 text-slate-100 flex flex-col min-h-screen">
+
+  <!-- Top Header Navigation -->
+  <header class="border-b border-slate-800 bg-slate-900/80 backdrop-blur sticky top-0 z-40">
+    <div class="max-w-6xl mx-auto px-4 py-3 flex flex-wrap items-center justify-between gap-3">
+      <div class="flex items-center space-x-3">
+        <div class="w-10 h-10 rounded-xl bg-gradient-to-tr from-emerald-600 to-teal-400 flex items-center justify-center text-xl shadow-lg shadow-emerald-900/40">
+          ♻️
+        </div>
+        <div>
+          <div class="flex items-center space-x-2">
+            <h1 class="font-extrabold text-base sm:text-lg tracking-tight text-white">SmartWaste AI</h1>
+            <span class="text-[10px] font-bold px-2 py-0.5 rounded-full bg-emerald-500/20 text-emerald-400 border border-emerald-500/30">DAY 11</span>
+          </div>
+          <p class="text-xs text-slate-400 hidden sm:block">Computer Vision + GIS Recycling Assistant</p>
+        </div>
+      </div>
+
+      <!-- User Score & Streak Badges -->
+      <div class="flex items-center space-x-3">
+        <div class="flex items-center space-x-1.5 px-3 py-1.5 rounded-lg bg-slate-800/80 border border-slate-700/60">
+          <span class="text-xs text-slate-400">Streak:</span>
+          <span id="user-streak-display" class="text-xs font-bold text-amber-400 flex items-center">
+            🔥 1 Day
+          </span>
+        </div>
+        <div class="flex items-center space-x-2 px-3 py-1.5 rounded-lg bg-emerald-950/60 border border-emerald-700/50 shadow-inner">
+          <span class="text-sm">🌿</span>
+          <div class="text-right">
+            <div class="text-[10px] text-emerald-400 font-medium uppercase tracking-wider">Green Score</div>
+            <div id="user-score-display" class="text-sm font-extrabold text-emerald-300">50</div>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <!-- Navigation Tabs -->
+    <div class="max-w-6xl mx-auto px-4 flex border-t border-slate-800/80 overflow-x-auto">
+      <button data-tab="tab-scanner" class="tab-btn px-4 py-2.5 text-xs sm:text-sm font-semibold border-b-2 border-emerald-500 text-emerald-400 flex items-center space-x-1.5 whitespace-nowrap">
+        <span>📸 Camera & AI Sorter</span>
+      </button>
+      <button data-tab="tab-map" class="tab-btn px-4 py-2.5 text-xs sm:text-sm font-semibold border-b-2 border-transparent text-gray-400 hover:text-gray-200 flex items-center space-x-1.5 whitespace-nowrap">
+        <span>🗺️ Recycling GIS Map</span>
+      </button>
+      <button data-tab="tab-leaderboard" class="tab-btn px-4 py-2.5 text-xs sm:text-sm font-semibold border-b-2 border-transparent text-gray-400 hover:text-gray-200 flex items-center space-x-1.5 whitespace-nowrap">
+        <span>🏆 Impact & Leaderboard</span>
+      </button>
+      <button data-tab="tab-guide" class="tab-btn px-4 py-2.5 text-xs sm:text-sm font-semibold border-b-2 border-transparent text-gray-400 hover:text-gray-200 flex items-center space-x-1.5 whitespace-nowrap">
+        <span>📘 Waste Guide Matrix</span>
+      </button>
+    </div>
+  </header>
+
+  <!-- Celebration Floating Toast -->
+  <div id="points-celebration-toast" class="hidden fixed top-24 left-1/2 -translate-x-1/2 z-50 px-6 py-2 rounded-full bg-emerald-500 text-slate-950 font-extrabold text-sm shadow-2xl shadow-emerald-500/50 pointer-events-none">
+    +15 Green Points Earned! 🌿
+  </div>
+
+  <!-- Main Container -->
+  <main class="flex-1 max-w-6xl w-full mx-auto p-4 sm:p-6 space-y-6">
+
+    <!-- ================= TAB 1: CAMERA & AI SORTER ================= -->
+    <section id="tab-scanner" class="tab-content space-y-6">
+
+      <!-- Hero Callout -->
+      <div class="p-4 sm:p-5 glass-panel border-emerald-500/20 bg-gradient-to-r from-emerald-950/40 via-slate-900 to-slate-900 flex flex-col md:flex-row items-start md:items-center justify-between gap-4">
+        <div>
+          <h2 class="text-base sm:text-lg font-bold text-white flex items-center space-x-2">
+            <span>Instant Waste Identification & Bin Guidance</span>
+          </h2>
+          <p class="text-xs sm:text-sm text-slate-300 mt-1 max-w-2xl">
+            Point your device camera at any discarded item. Our lightweight MobileNetV3 deep learning engine detects material composition, advises preparation steps to prevent contamination, and routes you to the closest verified recycler.
+          </p>
+        </div>
+        <div class="flex items-center space-x-2">
+          <label class="cursor-pointer px-4 py-2 rounded-lg bg-emerald-600 hover:bg-emerald-500 text-white font-semibold text-xs sm:text-sm transition flex items-center space-x-2 shadow-lg shadow-emerald-900/30">
+            <span>📁 Upload Image</span>
+            <input type="file" id="waste-file-input" accept="image/*" class="hidden">
+          </label>
+          <button id="start-camera-btn" class="px-4 py-2 rounded-lg bg-slate-800 hover:bg-slate-700 text-slate-200 font-semibold text-xs sm:text-sm border border-slate-700 transition flex items-center space-x-2">
+            <span>📷 Live Camera</span>
+          </button>
+        </div>
+      </div>
+
+      <!-- Quick Test Gallery (One-Click Testing for Evaluators) -->
+      <div class="glass-panel p-4">
+        <div class="flex items-center justify-between mb-3">
+          <div class="flex items-center space-x-2">
+            <span class="text-sm font-bold text-slate-200">🧪 Benchmark Test Gallery:</span>
+            <span class="text-xs text-slate-400">Click any sample item to test instantly without uploading</span>
+          </div>
+        </div>
+        <div class="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-6 gap-2.5">
+          <button onclick="testSample('plastic', 'plastic_bottle.jpg')" class="p-2.5 rounded-lg bg-slate-800/80 hover:bg-blue-900/40 border border-slate-700 hover:border-blue-500 transition text-left flex flex-col items-center text-center">
+            <span class="text-2xl mb-1">🧴</span>
+            <span class="text-xs font-semibold text-slate-200">Plastic Bottle</span>
+            <span class="text-[10px] text-blue-400">PET #1</span>
+          </button>
+          <button onclick="testSample('paper', 'cardboard_box.jpg')" class="p-2.5 rounded-lg bg-slate-800/80 hover:bg-sky-900/40 border border-slate-700 hover:border-sky-500 transition text-left flex flex-col items-center text-center">
+            <span class="text-2xl mb-1">📦</span>
+            <span class="text-xs font-semibold text-slate-200">Cardboard Box</span>
+            <span class="text-[10px] text-sky-400">Dry Corrugated</span>
+          </button>
+          <button onclick="testSample('metal', 'aluminum_can.jpg')" class="p-2.5 rounded-lg bg-slate-800/80 hover:bg-amber-900/40 border border-slate-700 hover:border-amber-500 transition text-left flex flex-col items-center text-center">
+            <span class="text-2xl mb-1">🥫</span>
+            <span class="text-xs font-semibold text-slate-200">Aluminum Can</span>
+            <span class="text-[10px] text-amber-400">ALU 41</span>
+          </button>
+          <button onclick="testSample('glass', 'glass_bottle.jpg')" class="p-2.5 rounded-lg bg-slate-800/80 hover:bg-emerald-900/40 border border-slate-700 hover:border-emerald-500 transition text-left flex flex-col items-center text-center">
+            <span class="text-2xl mb-1">🍾</span>
+            <span class="text-xs font-semibold text-slate-200">Glass Jar</span>
+            <span class="text-[10px] text-emerald-400">GL 71 Green</span>
+          </button>
+          <button onclick="testSample('organic', 'organic_food.jpg')" class="p-2.5 rounded-lg bg-slate-800/80 hover:bg-green-900/40 border border-slate-700 hover:border-green-500 transition text-left flex flex-col items-center text-center">
+            <span class="text-2xl mb-1">🍏</span>
+            <span class="text-xs font-semibold text-slate-200">Food Peels</span>
+            <span class="text-[10px] text-green-400">Compostable</span>
+          </button>
+          <button onclick="testSample('e-waste', 'electronic_device.jpg')" class="p-2.5 rounded-lg bg-slate-800/80 hover:bg-red-900/40 border border-slate-700 hover:border-red-500 transition text-left flex flex-col items-center text-center">
+            <span class="text-2xl mb-1">💻</span>
+            <span class="text-xs font-semibold text-slate-200">E-Waste Chip</span>
+            <span class="text-[10px] text-red-400">Special Drop-off</span>
+          </button>
+        </div>
+      </div>
+
+      <!-- Live Webcam / Scanner Area -->
+      <div id="camera-container" class="hidden glass-panel p-4 relative overflow-hidden flex flex-col items-center">
+        <div class="relative w-full max-w-md aspect-square bg-black rounded-xl overflow-hidden border border-slate-700 flex items-center justify-center">
+          <video id="webcam-video" autoplay playsinline class="w-full h-full object-cover"></video>
+          <div id="scanner-overlay" class="scanner-overlay"></div>
+        </div>
+        <div class="mt-4 flex space-x-3">
+          <button id="capture-camera-btn" class="px-5 py-2.5 rounded-lg bg-emerald-600 hover:bg-emerald-500 text-white font-bold text-sm shadow-lg shadow-emerald-900/40 flex items-center space-x-2">
+            <span>📸 Capture & Classify</span>
+          </button>
+          <button id="stop-camera-btn" class="px-4 py-2.5 rounded-lg bg-slate-800 hover:bg-slate-700 text-slate-300 font-semibold text-sm border border-slate-700">
+            <span>Close Camera</span>
+          </button>
+        </div>
+      </div>
+
+      <!-- Loading Spinner -->
+      <div id="classification-spinner" class="hidden glass-panel p-8 text-center space-y-3">
+        <div class="inline-block w-8 h-8 border-4 border-emerald-500 border-t-transparent rounded-full animate-spin"></div>
+        <p class="text-sm font-semibold text-slate-300">Analyzing composition with MobileNetV3 CNN...</p>
+      </div>
+
+      <!-- Preview Image Display -->
+      <div id="preview-container" class="hidden flex justify-center">
+        <div class="relative max-w-xs rounded-xl overflow-hidden border-2 border-slate-700 shadow-xl bg-slate-900">
+          <img id="captured-preview-img" src="" alt="Captured waste" class="w-full h-48 object-cover">
+          <div class="absolute bottom-2 left-2 px-2 py-0.5 rounded bg-black/70 text-[10px] text-white">Input Frame</div>
+        </div>
+      </div>
+
+      <!-- Results Panel -->
+      <div id="result-panel" class="hidden space-y-6">
+
+        <!-- Top Classification Banner -->
+        <div class="glass-panel p-6 border-emerald-500/30">
+          <div class="flex flex-col md:flex-row items-start md:items-center justify-between gap-4">
+            <div class="flex items-center space-x-4">
+              <span id="res-waste-icon" class="text-5xl">🧴</span>
+              <div>
+                <div class="flex items-center space-x-2">
+                  <h3 id="res-waste-title" class="text-xl sm:text-2xl font-extrabold text-white">Recyclable Plastics</h3>
+                  <span id="res-bin-tag" class="text-xs font-bold px-2.5 py-1 rounded-full border">Blue Recycling Bin</span>
+                </div>
+                <div class="mt-2 flex items-center space-x-3">
+                  <div class="w-40 sm:w-56 h-2 rounded-full bg-slate-800 overflow-hidden">
+                    <div id="res-confidence-bar" class="h-full bg-emerald-500 transition-all duration-500" style="width: 85%;"></div>
+                  </div>
+                  <span id="res-confidence-text" class="text-xs font-mono text-emerald-400 font-bold">85% Confidence</span>
+                </div>
+              </div>
+            </div>
+
+            <button id="confirm-sorted-btn" class="w-full md:w-auto px-5 py-3 rounded-xl bg-emerald-600 hover:bg-emerald-500 text-white font-extrabold text-sm shadow-xl shadow-emerald-900/40 transition flex items-center justify-center space-x-2">
+              <span>✔ I Disposed of This Correctly! (+Points)</span>
+            </button>
+          </div>
+
+          <!-- Low Confidence 2nd Photo Callout -->
+          <div id="low-confidence-box" class="hidden mt-4 p-3 rounded-lg bg-amber-950/40 border border-amber-600/40 text-amber-200 text-xs flex items-start space-x-2">
+            <span class="text-amber-400 font-bold text-sm">ℹ️</span>
+            <div>
+              <span class="font-bold">Multi-View Assistance Needed:</span>
+              <p id="low-conf-guidance" class="mt-0.5">Please take a second photo closer up or showing any printed recycling symbol.</p>
+            </div>
+          </div>
+        </div>
+
+        <!-- 2 Columns: Preparation & Contamination Guidelines + Eco Impact -->
+        <div class="grid grid-cols-1 md:grid-cols-2 gap-6">
+
+          <!-- Left Card: Preparation Steps -->
+          <div class="glass-panel p-5 space-y-4">
+            <h4 class="text-sm font-bold uppercase tracking-wider text-emerald-400 flex items-center space-x-2">
+              <span>📋 Step-by-Step Preparation Guide</span>
+            </h4>
+            <ul id="res-prep-steps" class="space-y-2.5">
+              <!-- Injected dynamically -->
+            </ul>
+
+            <div class="border-t border-slate-800 pt-3">
+              <h5 class="text-xs font-bold uppercase tracking-wider text-amber-400 mb-2 flex items-center space-x-1.5">
+                <span>⚠️ Contamination Risk Alert</span>
+              </h5>
+              <ul id="res-warn-steps" class="space-y-1.5">
+                <!-- Injected dynamically -->
+              </ul>
+            </div>
+          </div>
+
+          <!-- Right Card: Quantified Environmental Impact -->
+          <div class="glass-panel p-5 flex flex-col justify-between space-y-4">
+            <div>
+              <h4 class="text-sm font-bold uppercase tracking-wider text-teal-400 flex items-center space-x-2 mb-3">
+                <span>🌱 Quantified Environmental Impact</span>
+              </h4>
+              <div class="grid grid-cols-3 gap-3 text-center">
+                <div class="p-3 rounded-xl bg-slate-800/80 border border-slate-700/60">
+                  <div class="text-[10px] uppercase font-bold text-slate-400">CO₂ Avoided</div>
+                  <div id="res-co2-val" class="text-lg font-extrabold text-emerald-400 mt-1">0.18 kg</div>
+                </div>
+                <div class="p-3 rounded-xl bg-slate-800/80 border border-slate-700/60">
+                  <div class="text-[10px] uppercase font-bold text-slate-400">Water Saved</div>
+                  <div id="res-water-val" class="text-lg font-extrabold text-sky-400 mt-1">2.4 L</div>
+                </div>
+                <div class="p-3 rounded-xl bg-slate-800/80 border border-slate-700/60">
+                  <div class="text-[10px] uppercase font-bold text-slate-400">Diverted</div>
+                  <div id="res-landfill-val" class="text-lg font-extrabold text-amber-400 mt-1">45 g</div>
+                </div>
+              </div>
+
+              <!-- Eco Fact Box -->
+              <div class="mt-4 p-3.5 rounded-xl bg-emerald-950/30 border border-emerald-800/40 text-xs text-emerald-200/90 leading-relaxed">
+                <span class="font-bold text-emerald-300">Did you know?</span>
+                <span id="res-eco-fact">Recycling 1 ton of plastic saves approx 5,774 kWh of electricity.</span>
+              </div>
+            </div>
+
+            <!-- Nearest Recycler Teaser -->
+            <div id="res-recycler-teaser" class="border-t border-slate-800 pt-3">
+              <div class="flex items-center justify-between">
+                <div>
+                  <div class="text-xs font-bold text-slate-200" id="teaser-recycler-name">EcoHub Resource Center</div>
+                  <div class="text-[11px] text-emerald-400 font-semibold" id="teaser-recycler-dist">0.4 km away (5 min walk)</div>
+                  <div class="text-[10px] text-slate-400" id="teaser-recycler-addr">14 Green Horizon Blvd</div>
+                </div>
+                <button onclick="document.querySelector('[data-tab=\'tab-map\']').click()" class="px-3 py-1.5 rounded-lg bg-emerald-600/20 text-emerald-400 border border-emerald-500/30 text-xs font-bold hover:bg-emerald-600/30 transition">
+                  Navigate Map →
+                </button>
+              </div>
+            </div>
+
+          </div>
+        </div>
+
+      </div>
+
+    </section>
+
+
+    <!-- ================= TAB 2: RECYCLING GIS MAP ================= -->
+    <section id="tab-map" class="tab-content hidden space-y-6">
+
+      <!-- Map Header & Filter Controls -->
+      <div class="glass-panel p-4 flex flex-wrap items-center justify-between gap-3">
+        <div>
+          <h3 class="font-bold text-base text-white flex items-center space-x-2">
+            <span>OpenStreetMap Overpass GIS Explorer</span>
+          </h3>
+          <p class="text-xs text-slate-400">Real-world recycling drop-offs, depots, and e-waste facilities</p>
+        </div>
+
+        <div class="flex flex-wrap items-center gap-2">
+          <!-- City / GPS Preset Selector -->
+          <select id="city-preset-select" class="px-3 py-1.5 rounded-lg bg-slate-800 border border-slate-700 text-xs text-slate-200">
+            <option value="current">📍 My Current GPS</option>
+            <option value="12.9716,77.5946" selected>Bengaluru, India</option>
+            <option value="37.7749,-122.4194">San Francisco, USA</option>
+            <option value="40.7128,-74.0060">New York, USA</option>
+            <option value="51.5074,-0.1278">London, UK</option>
+            <option value="35.6762,139.6503">Tokyo, Japan</option>
+          </select>
+
+          <!-- Waste Type Filter -->
+          <select id="waste-filter-select" class="px-3 py-1.5 rounded-lg bg-slate-800 border border-slate-700 text-xs text-slate-200">
+            <option value="">All Waste Streams</option>
+            <option value="plastic">Plastics Only</option>
+            <option value="paper">Paper & Cardboard</option>
+            <option value="metal">Metals / Cans</option>
+            <option value="glass">Glass Banks</option>
+            <option value="e-waste">E-Waste & Batteries</option>
+            <option value="organic">Compost Pits</option>
+          </select>
+        </div>
+      </div>
+
+      <!-- Leaflet Map Container -->
+      <div class="glass-panel p-2 overflow-hidden shadow-2xl">
+        <div id="recycling-map" style="height: 440px; width: 100%;" class="rounded-xl"></div>
+      </div>
+
+      <!-- Nearest Facilities List Grid -->
+      <div>
+        <h4 class="text-sm font-bold text-slate-200 mb-3 flex items-center space-x-2">
+          <span>📍 Verified Facilities in Radius:</span>
+        </h4>
+        <div id="recyclers-list-container" class="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 gap-3">
+          <!-- Injected dynamically -->
+        </div>
+      </div>
+
+    </section>
+
+
+    <!-- ================= TAB 3: GAMIFICATION & LEADERBOARD ================= -->
+    <section id="tab-leaderboard" class="tab-content hidden space-y-6">
+
+      <!-- Environmental Achievements Banner -->
+      <div class="grid grid-cols-1 sm:grid-cols-3 gap-4">
+        <div class="glass-panel p-4 flex items-center space-x-3 border-emerald-500/20">
+          <div class="text-3xl">🌳</div>
+          <div>
+            <div class="text-[11px] text-slate-400 uppercase font-semibold">Total CO₂ Diverted</div>
+            <div id="stats-co2-total" class="text-xl font-extrabold text-emerald-400 mt-0.5">0.0 kg</div>
+          </div>
+        </div>
+        <div class="glass-panel p-4 flex items-center space-x-3 border-sky-500/20">
+          <div class="text-3xl">💧</div>
+          <div>
+            <div class="text-[11px] text-slate-400 uppercase font-semibold">Clean Water Saved</div>
+            <div id="stats-water-total" class="text-xl font-extrabold text-sky-400 mt-0.5">0.0 L</div>
+          </div>
+        </div>
+        <div class="glass-panel p-4 flex items-center space-x-3 border-amber-500/20">
+          <div class="text-3xl">🗑️</div>
+          <div>
+            <div class="text-[11px] text-slate-400 uppercase font-semibold">Diverted from Landfill</div>
+            <div id="stats-landfill-total" class="text-xl font-extrabold text-amber-400 mt-0.5">0.0 kg</div>
+          </div>
+        </div>
+      </div>
+
+      <!-- Badges Showcase -->
+      <div class="glass-panel p-5">
+        <div class="flex items-center justify-between mb-4">
+          <h3 class="font-bold text-sm text-slate-200 flex items-center space-x-2">
+            <span>🎖️ Your Unlocked Badges & Milestones</span>
+          </h3>
+          <span class="text-xs text-slate-400"><span id="user-items-display">0</span> items sorted to date</span>
+        </div>
+        <div id="user-badges-list" class="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 gap-3">
+          <!-- Injected dynamically -->
+        </div>
+      </div>
+
+      <!-- Community Leaderboard -->
+      <div class="glass-panel p-5">
+        <h3 class="font-bold text-sm text-slate-200 mb-3 flex items-center space-x-2">
+          <span>🏆 Community Sustainability Leaderboard</span>
+        </h3>
+        <div class="overflow-x-auto">
+          <table class="w-full text-left">
+            <thead>
+              <tr class="border-b border-slate-800 text-[11px] font-bold uppercase tracking-wider text-slate-400">
+                <th class="py-2">Rank</th>
+                <th class="py-2">Member</th>
+                <th class="py-2">Green Score</th>
+                <th class="py-2">Active Streak</th>
+                <th class="py-2">Items Logged</th>
+              </tr>
+            </thead>
+            <tbody id="leaderboard-body">
+              <!-- Injected dynamically -->
+            </tbody>
+          </table>
+        </div>
+      </div>
+
+    </section>
+
+
+    <!-- ================= TAB 4: WASTE GUIDE MATRIX ================= -->
+    <section id="tab-guide" class="tab-content hidden space-y-6">
+
+      <div class="glass-panel p-5">
+        <h3 class="text-base font-bold text-white mb-2">Municipal Waste Sorting Standard Matrix</h3>
+        <p class="text-xs text-slate-400 mb-6">
+          Standardized color codes, accepted polymer / material types, and contamination hazards.
+        </p>
+
+        <div class="grid grid-cols-1 md:grid-cols-2 gap-4">
+
+          <div class="p-4 rounded-xl border border-blue-500/30 bg-blue-950/20">
+            <div class="flex items-center space-x-3 mb-2">
+              <span class="text-2xl">🧴</span>
+              <div>
+                <h4 class="font-bold text-sm text-blue-300">Plastic (Blue/Yellow Bin)</h4>
+                <span class="text-[10px] text-blue-400">Codes #1 PETE, #2 HDPE, #4 LDPE, #5 PP</span>
+              </div>
+            </div>
+            <p class="text-xs text-slate-300 mb-2">Bottles, detergent tubs, beverage containers. Rinse and re-attach screw caps.</p>
+            <p class="text-[11px] text-amber-300"><b>Never include:</b> Soft thin shopping bags or black NIR-invisible food trays.</p>
+          </div>
+
+          <div class="p-4 rounded-xl border border-sky-500/30 bg-sky-950/20">
+            <div class="flex items-center space-x-3 mb-2">
+              <span class="text-2xl">📦</span>
+              <div>
+                <h4 class="font-bold text-sm text-sky-300">Paper & Cardboard (Blue Bin)</h4>
+                <span class="text-[10px] text-sky-400">Cardboard, Newspapers, Office Sheets</span>
+              </div>
+            </div>
+            <p class="text-xs text-slate-300 mb-2">Keep dry and flatten boxes. Remove packing tapes and Styrofoam.</p>
+            <p class="text-[11px] text-amber-300"><b>Never include:</b> Greasy pizza boxes or BPA thermal cash register receipts.</p>
+          </div>
+
+          <div class="p-4 rounded-xl border border-amber-500/30 bg-amber-950/20">
+            <div class="flex items-center space-x-3 mb-2">
+              <span class="text-2xl">🥫</span>
+              <div>
+                <h4 class="font-bold text-sm text-amber-300">Metals & Cans (Yellow Bin)</h4>
+                <span class="text-[10px] text-amber-400">ALU 41 Beverage Cans, FE 40 Tin Food Cans</span>
+              </div>
+            </div>
+            <p class="text-xs text-slate-300 mb-2">100% infinitely recyclable. Empty residue and ball up clean aluminum foil.</p>
+            <p class="text-[11px] text-amber-300"><b>Never include:</b> Pressurized gas aerosols unless fully emptied.</p>
+          </div>
+
+          <div class="p-4 rounded-xl border border-emerald-500/30 bg-emerald-950/20">
+            <div class="flex items-center space-x-3 mb-2">
+              <span class="text-2xl">🍾</span>
+              <div>
+                <h4 class="font-bold text-sm text-emerald-300">Glass Bottles (Green/Brown Bank)</h4>
+                <span class="text-[10px] text-emerald-400">GL 70, GL 71, GL 72 Jars & Bottles</span>
+              </div>
+            </div>
+            <p class="text-xs text-slate-300 mb-2">Rinse and remove metal caps. Infinitely recyclable with no purity loss.</p>
+            <p class="text-[11px] text-amber-300"><b>Never include:</b> Pyrex oven glass, ceramics, or lightbulbs.</p>
+          </div>
+
+          <div class="p-4 rounded-xl border border-green-500/30 bg-green-950/20">
+            <div class="flex items-center space-x-3 mb-2">
+              <span class="text-2xl">🍏</span>
+              <div>
+                <h4 class="font-bold text-sm text-green-300">Organic Compost (Green/Brown Bin)</h4>
+                <span class="text-[10px] text-green-400">Food Peels, Coffee Grounds, Yard Trimmings</span>
+              </div>
+            </div>
+            <p class="text-xs text-slate-300 mb-2">Eliminates landfill methane. Compost into nutrient-rich agricultural humus.</p>
+            <p class="text-[11px] text-amber-300"><b>Never include:</b> Fruit PLU barcode plastic stickers or non-compostable wraps.</p>
+          </div>
+
+          <div class="p-4 rounded-xl border border-red-500/30 bg-red-950/20">
+            <div class="flex items-center space-x-3 mb-2">
+              <span class="text-2xl">💻</span>
+              <div>
+                <h4 class="font-bold text-sm text-red-300">E-Waste & Batteries (Hazardous Drop-Off)</h4>
+                <span class="text-[10px] text-red-400">Li-Ion, Circuit Boards, Mobile Phones</span>
+              </div>
+            </div>
+            <p class="text-xs text-slate-300 mb-2">Contains gold, copper, and silver. Tape battery terminals before drop-off.</p>
+            <p class="text-[11px] text-amber-300"><b>Never include:</b> In normal household bins (puncture fire hazard!).</p>
+          </div>
+
+        </div>
+      </div>
+
+    </section>
+
+  </main>
+
+  <!-- Footer -->
+  <footer class="border-t border-slate-800 bg-slate-900/40 text-center py-4 text-xs text-slate-500">
+    <p>30 Projects in 30 Days · <b>Day 11: Smart Waste Sorting Assistant with Recycling Map</b></p>
+    <p class="mt-1">PyTorch MobileNetV3 · OpenStreetMap Overpass GIS · Leaflet.js · FastAPI</p>
+  </footer>
+
+  <!-- App Script -->
+  <script src="/static/app.js"></script>
+</body>
+</html>
