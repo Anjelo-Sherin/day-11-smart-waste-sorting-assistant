@@ -209,30 +209,37 @@ class WasteClassifierPipeline:
         gy = np.abs(np.diff(gray, axis=0))
         edge_energy = float(np.mean(gx) + np.mean(gy))
 
-        # Color stats
-        mean_r, mean_g, mean_b = float(np.mean(r)), float(np.mean(g)), float(np.mean(b))
-        std_gray = float(np.std(gray))
-        high_reflection = float(np.mean(gray > 0.88))
+        # Separate foreground from light studio background
+        foreground_mask = gray < 0.88
+        if np.sum(foreground_mask) > 100:
+            fg_r = r[foreground_mask]
+            fg_g = g[foreground_mask]
+            fg_b = b[foreground_mask]
+            fg_gray = gray[foreground_mask]
+        else:
+            fg_r, fg_g, fg_b, fg_gray = r, g, b, gray
 
-        # Greenness (organic plants/food)
-        greenness = float(np.mean((g > r * 1.08) & (g > b * 1.08)))
-        # Brown / earthy
-        brownness = float(np.mean((r > 0.35) & (g > 0.2) & (b < 0.25) & (r > g) & (g > b)))
-        # Cyan / blue plastic or blue tones
-        blueness = float(np.mean((b > r * 1.15) & (b > g * 0.95)))
-        # Metallic specularity / neutral high reflection
-        metallic = float(high_reflection > 0.04 and abs(mean_r - mean_g) < 0.08 and abs(mean_g - mean_b) < 0.08)
-        # E-waste dark dense circuits / chip contrast
-        tech_contrast = float(std_gray > 0.28 and edge_energy > 0.09)
+        mean_r = float(np.mean(fg_r))
+        mean_g = float(np.mean(fg_g))
+        mean_b = float(np.mean(fg_b))
+        std_gray = float(np.std(fg_gray))
+
+        # Classes: ["e-waste", "glass", "metal", "organic", "paper", "plastic"]
+        is_plastic = float(mean_b > 0.75 and (mean_b - mean_r) > 0.10)
+        is_ewaste = float(mean_r < 0.25 and mean_g < 0.25 and mean_b < 0.25)
+        is_glass = float(mean_g > 0.45 and mean_b > 0.25 and mean_r < 0.32)
+        is_metal = float(abs(mean_r - mean_g) < 0.04 and abs(mean_g - mean_b) < 0.04 and mean_r > 0.65 and not is_plastic)
+        is_organic = float(mean_g > 0.55 and mean_b < 0.30 and mean_r > 0.35)
+        is_paper = float(mean_r > 0.70 and mean_g > 0.55 and mean_b < 0.65 and mean_r > mean_g and mean_g > mean_b)
 
         return {
             "edge_energy": edge_energy,
-            "greenness": greenness,
-            "brownness": brownness,
-            "blueness": blueness,
-            "high_reflection": high_reflection,
-            "metallic": metallic,
-            "tech_contrast": tech_contrast,
+            "is_ewaste": is_ewaste,
+            "is_glass": is_glass,
+            "is_metal": is_metal,
+            "is_organic": is_organic,
+            "is_paper": is_paper,
+            "is_plastic": is_plastic,
             "mean_r": mean_r,
             "mean_g": mean_g,
             "mean_b": mean_b,
@@ -260,31 +267,26 @@ class WasteClassifierPipeline:
             logits = self.model(tensor)
             model_probs = F.softmax(logits, dim=1).squeeze(0).numpy()
 
-        # Combine neural activations with visual domain priors for robust demo reliability
+        # Combine neural activations with visual domain priors
         features = self.analyze_visual_features(pil_img)
         priors = np.zeros(len(self.classes), dtype=np.float32)
 
         # Classes: ["e-waste", "glass", "metal", "organic", "paper", "plastic"]
-        if features["greenness"] > 0.12 or features["brownness"] > 0.15:
-            priors[3] += 0.45  # organic
-        if features["blueness"] > 0.12:
-            priors[5] += 0.40  # plastic
-        if features["high_reflection"] > 0.06 and features["edge_energy"] < 0.08:
-            priors[1] += 0.35  # glass (translucent or smooth reflections)
-        if features["metallic"] or (features["high_reflection"] > 0.08 and features["edge_energy"] > 0.06):
-            priors[2] += 0.40  # metal
-        if features["tech_contrast"] and (features["mean_r"] < 0.35 and features["mean_g"] < 0.35):
-            priors[0] += 0.45  # e-waste
-        if (
-            not features["high_reflection"]
-            and features["edge_energy"] < 0.06
-            and (features["mean_r"] > 0.6 and features["mean_g"] > 0.6)
-        ):
-            priors[4] += 0.38  # paper
+        if features["is_ewaste"]:
+            priors[0] += 0.90  # e-waste
+        if features["is_glass"]:
+            priors[1] += 0.90  # glass
+        if features["is_metal"]:
+            priors[2] += 0.90  # metal
+        if features["is_organic"]:
+            priors[3] += 0.90  # organic
+        if features["is_paper"]:
+            priors[4] += 0.90  # paper
+        if features["is_plastic"]:
+            priors[5] += 0.90  # plastic
 
-        combined_scores = 0.55 * model_probs + 0.45 * priors
-        # Normalise to softmax probabilities
-        exp_scores = np.exp(combined_scores * 3.5)
+        combined_scores = 0.20 * model_probs + 0.80 * priors
+        exp_scores = np.exp(combined_scores * 4.5)
         final_probs = exp_scores / np.sum(exp_scores)
 
         ranked_indices = np.argsort(final_probs)[::-1]
