@@ -41,6 +41,30 @@ document.addEventListener("DOMContentLoaded", () => {
   loadUserProfile();
   loadLeaderboard();
   detectBrowserGeolocation();
+
+  // Check URL query parameters for demo links or automated screenshot captures
+  const urlParams = new URLSearchParams(window.location.search);
+  const targetTab = urlParams.get("tab");
+  if (targetTab) {
+    const tabBtn = document.querySelector(`[data-tab="tab-${targetTab}"]`);
+    if (tabBtn) tabBtn.click();
+  }
+
+  const autoSample = urlParams.get("auto_test");
+  if (autoSample) {
+    const sampleMap = {
+      plastic: "plastic_bottle.jpg",
+      paper: "cardboard_box.jpg",
+      metal: "aluminum_can.jpg",
+      glass: "glass_bottle.jpg",
+      organic: "organic_food.jpg",
+      ewaste: "electronic_device.jpg",
+    };
+    const imgName = sampleMap[autoSample.toLowerCase()] || "plastic_bottle.jpg";
+    setTimeout(() => {
+      window.testSample(autoSample, imgName);
+    }, 300);
+  }
 });
 
 // ---------------- Map Initialization (Leaflet) ----------------
@@ -50,10 +74,9 @@ function initMap() {
 
   mapInstance = L.map("recycling-map").setView([currentCoords.lat, currentCoords.lon], 13);
 
-  // Free OpenStreetMap Carto tiles (Dark Theme / Clean)
-  L.tileLayer("https://{s}.basemaps.cartocdn.com/rastertiles/voyager/{z}/{x}/{y}{r}.png", {
-    attribution: '&copy; <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a> contributors &copy; <a href="https://carto.com/attributions">CARTO</a>',
-    subdomains: "abcd",
+  // Standard Public OpenStreetMap tiles (100% Free, no watermark, no key)
+  L.tileLayer("https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png", {
+    attribution: '&copy; <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a> contributors',
     maxZoom: 19,
   }).addTo(mapInstance);
 
