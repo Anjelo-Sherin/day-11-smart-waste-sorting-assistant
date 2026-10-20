@@ -7,3 +7,4 @@ env/
 *.db
 .env
 .DS_Store
+screenshots/.chrome_tmp/
